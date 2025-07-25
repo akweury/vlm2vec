@@ -13,9 +13,9 @@ RUN apt-get update && \
 
 COPY requirements.txt .
 
-# Install packaging first to avoid build errors
 RUN pip install --upgrade pip && \
-    pip install packaging
+    pip install packaging && \
+    pip install torch
 
 RUN pip install --no-cache-dir -r requirements.txt
 
