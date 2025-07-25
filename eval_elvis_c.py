@@ -7,7 +7,7 @@ import os
 import wandb
 import json
 from pathlib import Path
-
+from rtpt import RTPT
 
 from src.arguments import ModelArguments, DataArguments
 from src.model.model import MMEBModel
