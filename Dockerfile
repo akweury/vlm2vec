@@ -4,7 +4,7 @@ WORKDIR /app
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    python3.10 python3-pip python3.10-venv \
+    python3.10 python3-pip python3.10-venv python3.10-dev \
     build-essential \
     ffmpeg \
     libsm6 \
