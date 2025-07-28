@@ -399,7 +399,7 @@ def run_vlm2vec_image(args, device, data_path):
         test_positive = [Image.open(img_path) for img_path in test_positive_images]
         test_negative = [Image.open(img_path) for img_path in test_negative_images]
 
-        logic_rules = infer_logic_rules(model, processor, train_positive, train_negative, device, principle)
+        logic_rules = infer_logic_rules_from_img_ilp_tasks(model, processor, train_positive, train_negative, device, principle)
 
         test_images = [(img, 1) for img in test_positive] + [(img, 0) for img in test_negative]
         accuracy, f1, precision, recall = evaluate_vlm2vec_image(model, processor, test_images, logic_rules, device, principle)
