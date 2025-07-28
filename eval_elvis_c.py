@@ -229,6 +229,7 @@ def evaluate_vlm2vec_image(model, processor, test_images, logic_rules, device, p
 
     return accuracy, f1, precision, recall
 
+
 def evaluate_vlm2vec(model, processor, test_images, logic_rules, device, principle, threshold=0.5):
     y_true = []
     y_pred = []
@@ -343,6 +344,7 @@ def run_vlm2vec_image(data_path, principle, batch_size, device, img_num, epochs)
     total_recall_scores = []
 
     for pattern_folder in pattern_folders:
+        print(f"Processing pattern folder: {pattern_folder.name}")
         train_positive_images = load_images(pattern_folder / "positive", img_num)
         train_negative_images = load_images(pattern_folder / "negative", img_num)
         test_positive_images = load_images((principle_path / "test" / pattern_folder.name) / "positive", img_num)
@@ -356,7 +358,7 @@ def run_vlm2vec_image(data_path, principle, batch_size, device, img_num, epochs)
         logic_rules = infer_logic_rules(model, processor, train_positive, train_negative, device, principle)
 
         test_images = [(img, 1) for img in test_positive] + [(img, 0) for img in test_negative]
-        accuracy, f1, precision, recall = evaluate_vlm2vec(model, processor, test_images, logic_rules, device, principle)
+        accuracy, f1, precision, recall = evaluate_vlm2vec_image(model, processor, test_images, logic_rules, device, principle)
 
         results[pattern_folder.name] = {
             "accuracy": accuracy,
