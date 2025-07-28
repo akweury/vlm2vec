@@ -108,30 +108,24 @@ def load_vlm2vec_model(args, device):
 
     return model, processor
 
+def infer_logic_rules_from_img_ilp_tasks(model, processor, train_positive, train_negative, device, principle, batch_size=2):
+    def get_reps(images, label):
+        reps = []
+        for i in range(0, len(images), batch_size):
+            batch_imgs = images[i:i+batch_size]
+            processor_inputs = {
+                "text": [f'{VLM_IMAGE_TOKENS[QWEN2_VL]} Represent the given image with the following question: What is in the image'] * len(batch_imgs),
+                "images": batch_imgs,
+            }
+            inputs = Qwen2_VL_process_fn(processor_inputs, processor)
+            inputs = batch_to_device(inputs, device)
+            with torch.no_grad():
+                reps.append(model(qry=inputs)["qry_reps"])
+        return torch.cat(reps, dim=0)
 
-def infer_logic_rules_from_img_ilp_tasks(model, processor, train_positive, train_negative, device, principle):
-    # Batch process positive images
-    processor_inputs_pos = {
-        "text": [f'{VLM_IMAGE_TOKENS[QWEN2_VL]} Represent the given image with the following question: What is in the image',
-                 f'{VLM_IMAGE_TOKENS[QWEN2_VL]} Represent the given image with the following question: What is in the image'],
-        "images": train_positive,
-    }
-    inputs_pos = Qwen2_VL_process_fn(processor_inputs_pos, processor)
-    inputs_pos = batch_to_device(inputs_pos, device)
-    with torch.no_grad():
-        qry_output_pos = model(qry=inputs_pos)["qry_reps"]
-        print("qry_output_pos", qry_output_pos)
-    # Batch process negative images
-    processor_inputs_neg = {
-        "text": [f"Represent the given image."] * len(train_negative),
-        "images": train_negative,
-    }
-    inputs_neg = Qwen2_VL_process_fn(processor_inputs_neg, processor)
-    inputs_neg = batch_to_device(inputs_neg, device)
-    with torch.no_grad():
-        qry_output_neg = model(qry=inputs_neg)["qry_reps"]
-        print("qry_output_neg", qry_output_neg)
-    # Prepare reasoning prompt
+    qry_output_pos = get_reps(train_positive, "positive")
+    qry_output_neg = get_reps(train_negative, "negative")
+
     reasoning_text = (
         f"Given these images labeled as {', '.join(['positive'] * len(train_positive) + ['negative'] * len(train_negative))}, "
         f"what is the common logic pattern in the positive images for the principle '{principle}'?"
@@ -148,6 +142,46 @@ def infer_logic_rules_from_img_ilp_tasks(model, processor, train_positive, train
     logic_text = processor.decode(output[0], skip_special_tokens=True)
 
     return logic_text
+
+# def infer_logic_rules_from_img_ilp_tasks(model, processor, train_positive, train_negative, device, principle):
+#     # Batch process positive images
+#     processor_inputs_pos = {
+#         "text": [f'{VLM_IMAGE_TOKENS[QWEN2_VL]} Represent the given image with the following question: What is in the image',
+#                  f'{VLM_IMAGE_TOKENS[QWEN2_VL]} Represent the given image with the following question: What is in the image'],
+#         "images": train_positive,
+#     }
+#     inputs_pos = Qwen2_VL_process_fn(processor_inputs_pos, processor)
+#     inputs_pos = batch_to_device(inputs_pos, device)
+#     with torch.no_grad():
+#         qry_output_pos = model(qry=inputs_pos)["qry_reps"]
+#         print("qry_output_pos", qry_output_pos)
+#     # Batch process negative images
+#     processor_inputs_neg = {
+#         "text": [f"Represent the given image."] * len(train_negative),
+#         "images": train_negative,
+#     }
+#     inputs_neg = Qwen2_VL_process_fn(processor_inputs_neg, processor)
+#     inputs_neg = batch_to_device(inputs_neg, device)
+#     with torch.no_grad():
+#         qry_output_neg = model(qry=inputs_neg)["qry_reps"]
+#         print("qry_output_neg", qry_output_neg)
+#     # Prepare reasoning prompt
+#     reasoning_text = (
+#         f"Given these images labeled as {', '.join(['positive'] * len(train_positive) + ['negative'] * len(train_negative))}, "
+#         f"what is the common logic pattern in the positive images for the principle '{principle}'?"
+#     )
+#     reasoning_inputs = processor(
+#         text=reasoning_text,
+#         images=None,
+#         return_tensors="pt"
+#     )
+#     reasoning_inputs = {key: value.to(device) for key, value in reasoning_inputs.items()}
+#
+#     with torch.no_grad():
+#         output = model.encoder.generate(**reasoning_inputs)
+#     logic_text = processor.decode(output[0], skip_special_tokens=True)
+#
+#     return logic_text
 
 
 def infer_logic_rules(model, processor, train_positive, train_negative, device, principle):
