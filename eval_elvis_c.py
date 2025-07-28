@@ -114,7 +114,12 @@ def infer_logic_rules_from_img_ilp_tasks(model, processor, train_positive, train
         for i in range(0, len(images), batch_size):
             batch_imgs = images[i:i+batch_size]
             processor_inputs = {
-                "text": [f'{VLM_IMAGE_TOKENS[QWEN2_VL]} Represent the given image with the following question: What is in the image'] * len(batch_imgs),
+                "text": [f"{VLM_IMAGE_TOKENS[QWEN2_VL]} This is a {label} example for a visual ILP task. "
+                         f"Identify the logic pattern that distinguishes positive from negative examples. "
+                         f"Consider Gestalt principles such as proximity, similarity, closure, symmetry, and continuity. "
+                         f"Focus on properties like color, shape, size, and count. "
+                         f"Describe the pattern or rule that applies to the positive examples."
+                         ] * len(batch_imgs),
                 "images": batch_imgs,
             }
             inputs = Qwen2_VL_process_fn(processor_inputs, processor)
@@ -127,9 +132,19 @@ def infer_logic_rules_from_img_ilp_tasks(model, processor, train_positive, train
     qry_output_neg = get_reps(train_negative, "negative")
 
     reasoning_text = (
-        f"Given these images labeled as {', '.join(['positive'] * len(train_positive) + ['negative'] * len(train_negative))}, "
-        f"what is the common logic pattern in the positive images for the principle '{principle}'?"
+        f"You are given sets of images labeled as positive and negative for a visual ILP task. "
+        f"Positive examples share a common logic pattern related to the principle '{principle}', "
+        f"while negative examples do not fully follow it. "
+        f"Based on the image representations, describe the general logic rule or pattern that distinguishes the positive examples. "
+        f"Reference Gestalt principles and relevant properties (color, shape, size, count) in your answer."
     )
+
+    # reasoning_text = (
+    #     f"Given these images labeled as {', '.join(['positive'] * len(train_positive) + ['negative'] * len(train_negative))}, "
+    #     f"The positive examples have the following description: {qry_output_pos},"
+    #     f"The negative examples have the following description: {qry_output_neg}"
+    #     f"what is the common logic pattern for such ILP task'?"
+    # )
     reasoning_inputs = processor(
         text=reasoning_text,
         images=None,
@@ -140,7 +155,7 @@ def infer_logic_rules_from_img_ilp_tasks(model, processor, train_positive, train
     with torch.no_grad():
         output = model.encoder.generate(**reasoning_inputs)
     logic_text = processor.decode(output[0], skip_special_tokens=True)
-
+    print(f"The reasoned logic text: {logic_text}")
     return logic_text
 
 # def infer_logic_rules_from_img_ilp_tasks(model, processor, train_positive, train_negative, device, principle):
