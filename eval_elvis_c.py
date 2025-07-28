@@ -102,7 +102,7 @@ def load_vlm2vec_model(args, device):
     data_args = DataArguments()
 
     processor = load_processor(model_args, data_args)
-    model = MMEBModel.load(model_args, args.use_flase_attn)
+    model = MMEBModel.load(model_args, args.use_flash_attn)
     model = model.to(device)
     model.eval()
 
