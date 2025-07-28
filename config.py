@@ -13,8 +13,7 @@ colors = ['blue', 'green', 'orange']
 prin_in_neg = False
 
 root = Path(__file__).parents[0]
-raw_patterns = root / 'video_tasks'
-
+raw_patterns = root / 'grb'
 output_dir = root / "output"
 if not output_dir.exists():
     output_dir.mkdir(parents=True)

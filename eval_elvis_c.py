@@ -299,7 +299,7 @@ if __name__ == "__main__":
 
     data_path = config.raw_patterns / args.principle
     # List of baseline models
-
+    print("data_path", data_path)
     run_vlm2vec(data_path, args.principle, args.batch_size, device, args.img_num, args.epochs)
 
     print("All model evaluations completed.")
