@@ -16,12 +16,12 @@ from src.utils import batch_to_device
 from src.model.vlm_backbone.qwen2_vl.qwen_vl_utils import process_vision_info
 import config
 
+
 def load_images(image_dir, max_images=None):
     image_paths = sorted([f for f in Path(image_dir).glob("*.png")])
     if max_images is not None:
         image_paths = image_paths[:max_images]
     return image_paths
-
 
 
 def load_videos(video_dir, max_videos=None):
@@ -90,7 +90,7 @@ def init_wandb(batch_size):
 #
 #     return metrics
 
-def load_vlm2vec_model(device):
+def load_vlm2vec_model(args, device):
     model_args = ModelArguments(
         model_name='Qwen/Qwen2-VL-7B-Instruct',
         checkpoint_path='TIGER-Lab/VLM2Vec-Qwen2VL-7B',
@@ -102,7 +102,7 @@ def load_vlm2vec_model(device):
     data_args = DataArguments()
 
     processor = load_processor(model_args, data_args)
-    model = MMEBModel.load(model_args)
+    model = MMEBModel.load(model_args, args.use_flase_attn)
     model = model.to(device)
     model.eval()
 
@@ -186,7 +186,6 @@ def infer_logic_rules(model, processor, train_positive, train_negative, device, 
     # print(string, '=', model.compute_similarity(qry_output, tgt_output))
 
     return logic_text
-
 
 
 def evaluate_vlm2vec_image(model, processor, test_images, logic_rules, device, principle, threshold=0.5):
@@ -329,9 +328,15 @@ def run_vlm2vec_video(data_path, principle, batch_size, device, img_num, epochs)
     wandb.finish()
     return avg_accuracy, avg_f1
 
-def run_vlm2vec_image(data_path, principle, batch_size, device, img_num, epochs):
+
+def run_vlm2vec_image(args, device, data_path):
+    principle = args.principle
+    batch_size = args.batch_size
+    img_num = args.img_num
+    epochs = args.epochs
+
     init_wandb(batch_size)
-    model, processor = load_vlm2vec_model(device)
+    model, processor = load_vlm2vec_model(args, device)
     principle_path = Path(data_path)
 
     pattern_folders = sorted(
@@ -385,10 +390,12 @@ def run_vlm2vec_image(data_path, principle, batch_size, device, img_num, epochs)
     wandb.finish()
     return avg_accuracy, avg_f1
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate baseline models with CUDA support.")
     parser.add_argument("--principle", type=str, required=True, help="Specify the principle to filter data.")
     parser.add_argument("--device_id", type=int, help="Specify GPU device ID. If not provided, CPU will be used.")
+    parser.add_argument("--use_flash_attn", action="store_true", help="Enable FlashAttention if supported.")
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--img_num", type=int, default=5)
     parser.add_argument("--batch_size", type=int)
@@ -402,6 +409,6 @@ if __name__ == "__main__":
     data_path = config.raw_patterns / args.principle
     # List of baseline models
     print("data_path", data_path)
-    run_vlm2vec_image(data_path, args.principle, args.batch_size, device, args.img_num, args.epochs)
+    run_vlm2vec_image(args, device, data_path)
 
     print("All model evaluations completed.")

@@ -205,7 +205,7 @@ class MMEBModel(nn.Module):
 
 
     @classmethod
-    def load(cls, model_args: ModelArguments, is_trainable=True, **kwargs):
+    def load(cls, model_args: ModelArguments, is_trainable=True,use_flash_attn=True, **kwargs):
         # Loading the base model
         model_name_or_path = model_args.checkpoint_path if model_args.checkpoint_path else model_args.model_name
         config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
@@ -215,8 +215,10 @@ class MMEBModel(nn.Module):
         print_master(f'Loading backbone [{model_args.model_backbone}] from {model_name_or_path}')
         if model_args.model_backbone in {LLAVA_NEXT, QWEN2_VL, QWEN2_5_VL, QWEN2_VL_TOKENSELECTION, QWEN2_5_VL_TOKENSELECTION, E5_V}:
             config = AutoConfig.from_pretrained(model_args.model_name, trust_remote_code=True)
-            config._attn_implementation = "flash_attention_2"
-            config.vision_config._attn_implementation = "flash_attention_2"
+            attn_impl = "flash_attention_2" if use_flash_attn else "eager"
+
+            config._attn_implementation = attn_impl
+            config.vision_config._attn_implementation = attn_impl
             base_model = backbone2model[model_args.model_backbone].from_pretrained(
                 model_args.model_name,
                 torch_dtype=torch.bfloat16,
