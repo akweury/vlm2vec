@@ -9,10 +9,9 @@ import json
 from pathlib import Path
 from rtpt import RTPT
 
-
 from src.arguments import ModelArguments, DataArguments
 from src.model.model import MMEBModel
-from src.model.processor import load_processor, QWEN2_VL, VLM_VIDEO_TOKENS,Qwen2_VL_process_fn
+from src.model.processor import load_processor, QWEN2_VL, VLM_VIDEO_TOKENS, VLM_IMAGE_TOKENS, Qwen2_VL_process_fn
 from src.utils import batch_to_device
 from src.model.vlm_backbone.qwen2_vl.qwen_vl_utils import process_vision_info
 import config
@@ -109,17 +108,19 @@ def load_vlm2vec_model(args, device):
 
     return model, processor
 
+
 def infer_logic_rules_from_img_ilp_tasks(model, processor, train_positive, train_negative, device, principle):
     # Batch process positive images
     processor_inputs_pos = {
-        "text": [f"Represent the given image."] * len(train_positive),
+        "text": [f'{VLM_IMAGE_TOKENS[QWEN2_VL]} Represent the given image with the following question: What is in the image',
+                 f'{VLM_IMAGE_TOKENS[QWEN2_VL]} Represent the given image with the following question: What is in the image'],
         "images": train_positive,
     }
     inputs_pos = Qwen2_VL_process_fn(processor_inputs_pos, processor)
     inputs_pos = batch_to_device(inputs_pos, device)
     with torch.no_grad():
         qry_output_pos = model(qry=inputs_pos)["qry_reps"]
-
+        print("qry_output_pos", qry_output_pos)
     # Batch process negative images
     processor_inputs_neg = {
         "text": [f"Represent the given image."] * len(train_negative),
@@ -129,7 +130,7 @@ def infer_logic_rules_from_img_ilp_tasks(model, processor, train_positive, train
     inputs_neg = batch_to_device(inputs_neg, device)
     with torch.no_grad():
         qry_output_neg = model(qry=inputs_neg)["qry_reps"]
-
+        print("qry_output_neg", qry_output_neg)
     # Prepare reasoning prompt
     reasoning_text = (
         f"Given these images labeled as {', '.join(['positive'] * len(train_positive) + ['negative'] * len(train_negative))}, "
@@ -147,6 +148,7 @@ def infer_logic_rules_from_img_ilp_tasks(model, processor, train_positive, train
     logic_text = processor.decode(output[0], skip_special_tokens=True)
 
     return logic_text
+
 
 def infer_logic_rules(model, processor, train_positive, train_negative, device, principle):
     # Collect video representations for all training videos
@@ -394,14 +396,10 @@ def run_vlm2vec_image(args, device, data_path):
         test_positive_images = load_images((principle_path / "test" / pattern_folder.name) / "positive", img_num)
         test_negative_images = load_images((principle_path / "test" / pattern_folder.name) / "negative", img_num)
 
-        for img in train_negative_images:
-            print(f"Train Negative Image path: {img}")
         train_positive = [Image.open(img_path) for img_path in train_positive_images]
         train_negative = [Image.open(img_path) for img_path in train_negative_images]
         test_positive = [Image.open(img_path) for img_path in test_positive_images]
         test_negative = [Image.open(img_path) for img_path in test_negative_images]
-        for pos in train_positive:
-            print(f"Train Positive Image Type: {type(pos)}")
         logic_rules = infer_logic_rules_from_img_ilp_tasks(model, processor, train_positive, train_negative, device, principle)
 
         test_images = [(img, 1) for img in test_positive] + [(img, 0) for img in test_negative]
