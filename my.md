@@ -8,13 +8,16 @@ docker build -t vlm2vec .
 
 ### Running the ELVIS-C Docker Container
 ``` 
+export HF_HOME=/app/hf_cache
+export TRANSFORMERS_CACHE=/app/hf_cache
+
 docker run -it --gpus all -v /home/ml-jsha/ELVIS/grb:/grb --rm vlm2vec:latest
 ```
 
 ### Running ELVIS-C
 
 ```
-python -m eval_elvis_c --batch_size 1 --principle continuity --device_id 4
+python3 -m eval_elvis_c --batch_size 1 --principle continuity --device_id 4
 ```
 
 

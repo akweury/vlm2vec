@@ -13,7 +13,7 @@ colors = ['blue', 'green', 'orange']
 prin_in_neg = False
 
 root = Path(__file__).parents[0]
-raw_patterns = root / ".." / 'grb'
+raw_patterns = root / ".." / 'grb' / "res_1024_pin_False"
 output_dir = root / "output"
 if not output_dir.exists():
     output_dir.mkdir(parents=True)
