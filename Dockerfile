@@ -22,3 +22,6 @@ RUN pip3 install --upgrade pip && \
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY . .
+
+ENV HF_HOME=/app/hf_cache
+ENV TRANSFORMERS_CACHE=/app/hf_cache
