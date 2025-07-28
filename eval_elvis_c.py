@@ -394,6 +394,8 @@ def run_vlm2vec_image(args, device, data_path):
         test_positive_images = load_images((principle_path / "test" / pattern_folder.name) / "positive", img_num)
         test_negative_images = load_images((principle_path / "test" / pattern_folder.name) / "negative", img_num)
 
+        for img in train_negative_images:
+            print(f"Train Negative Image path: {img}")
         train_positive = [Image.open(img_path) for img_path in train_positive_images]
         train_negative = [Image.open(img_path) for img_path in train_negative_images]
         test_positive = [Image.open(img_path) for img_path in test_positive_images]
