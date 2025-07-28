@@ -1,5 +1,5 @@
 torch
-numpy==1.26.4
+numpy
 torchvision
 transformers==4.52.3
 huggingface-hub
