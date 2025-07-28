@@ -281,13 +281,14 @@ def evaluate_vlm2vec_image(model, processor, test_images, logic_rules, device, p
     for img, label in test_images:
         # Prepare image representation
         image_inputs = processor(
-            text=f"Represent the given image.",
-            images=[img],
+            text=f"{VLM_IMAGE_TOKENS[QWEN2_VL]}  Represent the given image with the following question: What is in the image",
+            images=img,
             return_tensors="pt"
         )
         image_inputs = {key: value.to(device) for key, value in image_inputs.items()}
         with torch.no_grad():
             image_rep = model(qry=image_inputs)["qry_reps"]
+            print("image_rep", image_rep)
 
         # Compute similarity
         similarity = model.compute_similarity(image_rep, logic_rep).item()
