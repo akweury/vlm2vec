@@ -16,6 +16,11 @@ from src.utils import batch_to_device
 from src.model.vlm_backbone.qwen2_vl.qwen_vl_utils import process_vision_info
 import config
 
+def load_images(image_dir, max_images=None):
+    image_paths = sorted([f for f in Path(image_dir).glob("*.png")])
+    if max_images is not None:
+        image_paths = image_paths[:max_images]
+    return image_paths
 
 
 
@@ -182,6 +187,48 @@ def infer_logic_rules(model, processor, train_positive, train_negative, device, 
 
     return logic_text
 
+
+
+def evaluate_vlm2vec_image(model, processor, test_images, logic_rules, device, principle, threshold=0.5):
+    y_true = []
+    y_pred = []
+    similarities = []
+
+    # Prepare logic rule representation
+    logic_inputs = processor(
+        text=logic_rules,
+        images=None,
+        return_tensors="pt"
+    )
+    logic_inputs = {key: value.to(device) for key, value in logic_inputs.items()}
+    with torch.no_grad():
+        logic_rep = model(tgt=logic_inputs)["tgt_reps"]
+
+    for img, label in test_images:
+        # Prepare image representation
+        image_inputs = processor(
+            text=f"Represent the given image.",
+            images=[img],
+            return_tensors="pt"
+        )
+        image_inputs = {key: value.to(device) for key, value in image_inputs.items()}
+        with torch.no_grad():
+            image_rep = model(qry=image_inputs)["qry_reps"]
+
+        # Compute similarity
+        similarity = model.compute_similarity(image_rep, logic_rep).item()
+        similarities.append(similarity)
+        pred = 1 if similarity >= threshold else 0
+        y_pred.append(pred)
+        y_true.append(label)
+
+    accuracy = accuracy_score(y_true, y_pred)
+    precision = precision_score(y_true, y_pred, zero_division=0)
+    recall = recall_score(y_true, y_pred, zero_division=0)
+    f1 = f1_score(y_true, y_pred, zero_division=0)
+
+    return accuracy, f1, precision, recall
+
 def evaluate_vlm2vec(model, processor, test_images, logic_rules, device, principle, threshold=0.5):
     y_true = []
     y_pred = []
@@ -225,7 +272,7 @@ def evaluate_vlm2vec(model, processor, test_images, logic_rules, device, princip
     return accuracy, f1, precision, recall
 
 
-def run_vlm2vec(data_path, principle, batch_size, device, img_num, epochs):
+def run_vlm2vec_video(data_path, principle, batch_size, device, img_num, epochs):
     init_wandb(batch_size)
     model, processor = load_vlm2vec_model(device)
     principle_path = Path(data_path)
@@ -281,7 +328,60 @@ def run_vlm2vec(data_path, principle, batch_size, device, img_num, epochs):
     wandb.finish()
     return avg_accuracy, avg_f1
 
+def run_vlm2vec_image(data_path, principle, batch_size, device, img_num, epochs):
+    init_wandb(batch_size)
+    model, processor = load_vlm2vec_model(device)
+    principle_path = Path(data_path)
 
+    pattern_folders = sorted(
+        [f for f in (principle_path / "train").iterdir() if f.is_dir() and not f.name.startswith('.')]
+    )
+
+    total_accuracy, total_f1 = [], []
+    results = {}
+    total_precision_scores = []
+    total_recall_scores = []
+
+    for pattern_folder in pattern_folders:
+        train_positive_images = load_images(pattern_folder / "positive", img_num)
+        train_negative_images = load_images(pattern_folder / "negative", img_num)
+        test_positive_images = load_images((principle_path / "test" / pattern_folder.name) / "positive", img_num)
+        test_negative_images = load_images((principle_path / "test" / pattern_folder.name) / "negative", img_num)
+
+        train_positive = [Image.open(img_path) for img_path in train_positive_images]
+        train_negative = [Image.open(img_path) for img_path in train_negative_images]
+        test_positive = [Image.open(img_path) for img_path in test_positive_images]
+        test_negative = [Image.open(img_path) for img_path in test_negative_images]
+
+        logic_rules = infer_logic_rules(model, processor, train_positive, train_negative, device, principle)
+
+        test_images = [(img, 1) for img in test_positive] + [(img, 0) for img in test_negative]
+        accuracy, f1, precision, recall = evaluate_vlm2vec(model, processor, test_images, logic_rules, device, principle)
+
+        results[pattern_folder.name] = {
+            "accuracy": accuracy,
+            "f1_score": f1,
+            "logic_rules": logic_rules,
+            "precision": precision,
+            "recall": recall
+        }
+        total_accuracy.append(accuracy)
+        total_f1.append(f1)
+        total_precision_scores.append(precision)
+        total_recall_scores.append(recall)
+
+    avg_accuracy = sum(total_accuracy) / len(total_accuracy) if total_accuracy else 0
+    avg_f1 = sum(total_f1) / len(total_f1) if total_f1 else 0
+
+    results["average"] = {"accuracy": avg_accuracy, "f1_score": avg_f1}
+    results_path = Path(data_path) / f"vlm2vec_image_{principle}.json"
+    with open(results_path, "w") as json_file:
+        json.dump(results, json_file, indent=4)
+
+    print("Image evaluation complete. Results saved to vlm2vec_image_{principle}.json.")
+    print(f"Overall Average Accuracy: {avg_accuracy:.2f}% | Average F1 Score: {avg_f1:.4f}")
+    wandb.finish()
+    return avg_accuracy, avg_f1
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate baseline models with CUDA support.")
@@ -300,6 +400,6 @@ if __name__ == "__main__":
     data_path = config.raw_patterns / args.principle
     # List of baseline models
     print("data_path", data_path)
-    run_vlm2vec(data_path, args.principle, args.batch_size, device, args.img_num, args.epochs)
+    run_vlm2vec_image(data_path, args.principle, args.batch_size, device, args.img_num, args.epochs)
 
     print("All model evaluations completed.")
