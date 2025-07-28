@@ -9,9 +9,10 @@ import json
 from pathlib import Path
 from rtpt import RTPT
 
+
 from src.arguments import ModelArguments, DataArguments
 from src.model.model import MMEBModel
-from src.model.processor import load_processor, QWEN2_VL, VLM_VIDEO_TOKENS
+from src.model.processor import load_processor, QWEN2_VL, VLM_VIDEO_TOKENS,Qwen2_VL_process_fn
 from src.utils import batch_to_device
 from src.model.vlm_backbone.qwen2_vl.qwen_vl_utils import process_vision_info
 import config
@@ -108,6 +109,44 @@ def load_vlm2vec_model(args, device):
 
     return model, processor
 
+def infer_logic_rules_from_img_ilp_tasks(model, processor, train_positive, train_negative, device, principle):
+    # Batch process positive images
+    processor_inputs_pos = {
+        "text": [f"Represent the given image."] * len(train_positive),
+        "images": train_positive,
+    }
+    inputs_pos = Qwen2_VL_process_fn(processor_inputs_pos, processor)
+    inputs_pos = batch_to_device(inputs_pos, device)
+    with torch.no_grad():
+        qry_output_pos = model(qry=inputs_pos)["qry_reps"]
+
+    # Batch process negative images
+    processor_inputs_neg = {
+        "text": [f"Represent the given image."] * len(train_negative),
+        "images": train_negative,
+    }
+    inputs_neg = Qwen2_VL_process_fn(processor_inputs_neg, processor)
+    inputs_neg = batch_to_device(inputs_neg, device)
+    with torch.no_grad():
+        qry_output_neg = model(qry=inputs_neg)["qry_reps"]
+
+    # Prepare reasoning prompt
+    reasoning_text = (
+        f"Given these images labeled as {', '.join(['positive'] * len(train_positive) + ['negative'] * len(train_negative))}, "
+        f"what is the common logic pattern in the positive images for the principle '{principle}'?"
+    )
+    reasoning_inputs = processor(
+        text=reasoning_text,
+        images=None,
+        return_tensors="pt"
+    )
+    reasoning_inputs = {key: value.to(device) for key, value in reasoning_inputs.items()}
+
+    with torch.no_grad():
+        output = model.encoder.generate(**reasoning_inputs)
+    logic_text = processor.decode(output[0], skip_special_tokens=True)
+
+    return logic_text
 
 def infer_logic_rules(model, processor, train_positive, train_negative, device, principle):
     # Collect video representations for all training videos
