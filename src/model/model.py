@@ -205,7 +205,7 @@ class MMEBModel(nn.Module):
 
 
     @classmethod
-    def load(cls, model_args: ModelArguments, is_trainable=True,use_flash_attn=True, **kwargs):
+    def load(cls, model_args: ModelArguments, is_trainable=True,use_flash_attn=False, **kwargs):
         # Loading the base model
         model_name_or_path = model_args.checkpoint_path if model_args.checkpoint_path else model_args.model_name
         config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
